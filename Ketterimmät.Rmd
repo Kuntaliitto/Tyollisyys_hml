@@ -1,0 +1,537 @@
+---
+title: "Ketterimmät - Hämeenlinnan seudun työllisyysohjelma 2017-2025 Tilastoraportti"
+output:
+  html_document:
+    theme: united
+    toc: yes
+params: 
+  output_dir: "../Raportit"
+date: "`r Sys.Date()`"
+---
+
+<!--KIRJASTOT YM-->
+```{r echo=F, message=F, warning=F}
+setwd(getwd())
+library(data.table)
+library(ggplot2)
+library(plotly)
+library(rAmCharts)
+library(rCharts)
+library(reshape)
+library(plyr)
+library(pxweb)
+library(sotkanet)
+#library(reshape2)#library(rCharts)#library(scales)#library(dplyr)#library(gridExtra)
+#kokeilu
+#d <- pxweb_interactive("pxnet2.stat.fi")
+#d <- pxweb_interactive("vero2.stat.fi")
+#d <- pxweb_interactive("http://visitfinland.stat.fi/")
+nyt <- "2020 Maaliskuu"
+#rajataan alkupään dataa pois työllisyystilastoista
+raja <- "2014M12"
+```
+
+<!--ASETUKSET-->
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(cache=TRUE)
+```
+
+#### Taustatietoa
+Tässä raportissa esitellään Ketterimmät - Hämeenlinnan seudun työllisyysohjelmassa seurattavat tilastot. Ohjelma kokonaisuudessaan on luettavissa [täällä](https://www.hameenlinna.fi/tyo-ja-elinkeino/tyollisyyspalvelut/seudullinen-ketterimmat-tyollisyysohjelma/).
+
+Päivitetty 4/2020
+
+#### Käyttöohje
+Raportin kuvaajia voi muokata klikkaamalla sarjojen nimiä kuvaajan ala- tai yläpuolella. Valitsemalla vain osan sarjoista saa pienemmät luvut erottumaan paremmin. Kuvaajista saa yksittäiset luvut näkymään viemällä hiiren haluttuun pisteeseen. Osassa kuvaajista voi valita sarjat päällekkäin (stacked), vierekkäin (grouped), suhteellisina osuuksina (expanded) tai symmetrisenä virtakuviona (stream). 
+
+# 1 Visio 2025
+### Keskimääräinen työttömyyden kesto
+Lähde: Työ- ja elinkeinoministeriö, Työnvälitystilasto
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- fread("../Data/rajapinta/data_kesto.csv", dec=",")
+data <- data[,c(1:5,7)]
+names(data) <- c("Alue","Sukupuoli","Ikäryhmä","Kesto","Kuukausi","Keskiarvo")
+data2 <- data[Ikäryhmä=="Yhteensä" & Sukupuoli=="Yhteensä"]
+data3 <- dcast(data2, Kuukausi~Alue, value.var="Keskiarvo")
+data3 <- data3[Kuukausi>raja]
+
+kuvaaja4a <- plot_ly(data3, x=~Kuukausi, width=950) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  add_lines(y=~`KOKO MAA`, name="KOKO MAA", color=I("black")) %>%
+  add_lines(y=~`SK051 Hämeenlinna`, name="Hämeenlinnan seutu", color=I("green")) %>%
+  layout(yaxis=list(title="Työttömyyden kesto (vko)"), xaxis=list(title="Kuukausi"))
+kuvaaja4a
+```
+
+### Päättynyttä työttömyysjaksoa edeltäneen työttömyyden kesto
+
+#### Hämeenlinnan seutu yhteensä
+Lähde: Hämeen TE-toimisto
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- read.csv("../Data/työttömyysvirta.csv", sep=";")
+names(data) <- c("Vuosi","alle 3kk", "3kk - alle 6kk", "6kk - alle  12kk", "12kk - alle 24kk", "24kk ja yli")
+data2 <- melt(data, id="Vuosi")
+names(data2) <- c("Vuosi", "Kesto", "Työpaikat")
+kuvaaja5a <- nPlot(Työpaikat~Vuosi, group="Kesto", type="stackedAreaChart", data=data2)
+kuvaaja5a$chart(useInteractiveGuideline=TRUE, transitionDuration=500)
+kuvaaja5a$print('Kuvaaja5a', include_assets = TRUE)
+```
+
+# 2 Ohjelman painopisteet
+
+## 2.1 Asiakasrajapinta: Työnhakijapalvelut
+### Alle 25-vuotiaiden työttömien määrä
+Lähde: Työ- ja elinkeinoministeriö, Työnvälitystilasto
+```{r echo=F, message=F, warning=F, results='asis', comment=NA, fig.width=1200}
+data <- fread("../Data/rajapinta/data_nuoriso.csv", dec=",")
+#data <- setDT(data_nuoriso)
+names(data) <- c("Alue","Kuukausi","Työnhakijat","Työvoima","Nuorisotyöttömyys")
+data2 <- dcast(data[,c(1,2,3)], Kuukausi~Alue, value.var="Työnhakijat")
+#data3 <- dcast(data[,c(1,2,5)], Kuukausi~Alue, value.var="Nuorisotyöttömyys")
+data2 <- data2[Kuukausi>raja]
+
+kuvaaja6a <- plot_ly(data2, x=~Kuukausi, width=950) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  add_lines(y=~`SK051 Hämeenlinna`, name="Hämeenlinnan seutu", color=I("green")) %>%
+  layout(yaxis=list(title="Työttömät työnhakijat"), xaxis=list(title="Kuukausi"))
+kuvaaja6a
+```
+
+### Nuorisotyöttömyys %
+Lähde: THL SotkaNet / Työ- ja elinkeinoministeriö, Työnvälitystilasto
+
+#### Selite
+Indikaattori ilmaisee 15 - 24-vuotiaiden työttömien osuuden prosentteina 18 - 24-vuotiaasta työvoimasta. Nuorisotyötön on 15 - 24-vuotias työtön. (Lähde: SotkaNet/Työ- ja elinkeinoministeriö)
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- fread("../Data/rajapinta/data_nuoriso.csv", dec=",")
+#data <- setDT(data_nuoriso)
+names(data) <- c("Alue","Kuukausi","Työnhakijat","Työvoima","Nuorisotyöttömyys")
+#data2 <- dcast(data[,c(1,2,3)], Kuukausi~Alue, value.var="Työnhakijat")
+data3 <- dcast(data[,c(1,2,5)], Kuukausi~Alue, value.var="Nuorisotyöttömyys")
+data3 <- data3[Kuukausi>raja]
+
+kuvaaja6b <- plot_ly(data3, x=~Kuukausi, width=950) %>%
+  #add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  add_lines(y=~`KOKO MAA`, name="KOKO MAA", color=I("black")) %>%
+  add_lines(y=~`SK051 Hämeenlinna`, name="Hämeenlinnan seutu", color=I("green")) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  layout(yaxis=list(title="Nuorisotyöttömyys (%)"), xaxis=list(title="Kuukausi"))
+kuvaaja6b
+```
+
+### Avoimien työpaikkojen täyttymisen aika TE-palveluissa
+#### Hämeenlinnan seutu yhteensä
+Lähde: Hämeen TE-toimisto
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- read.csv("../Data/työpaikat_täyttyminen.csv", sep=";")
+names(data) <- c("Vuosi", "Alle 2vko", "2vko-1kk", "1kk-2kk", "2kk-3kk", "Yli 3kk")
+data2 <- melt(data, id="Vuosi")
+names(data2) <- c("Vuosi", "Kesto", "Työpaikat")
+kuvaaja7 <- nPlot(Työpaikat~Vuosi, group="Kesto", type="stackedAreaChart", data=data2)
+kuvaaja7$chart(useInteractiveGuideline=TRUE)
+kuvaaja7$print('Kuvaaja7', include_assets = TRUE)
+```
+
+### Rakennetyöttömien määrä
+Lähde: Työ- ja elinkeinoministeriö, Työnvälitystilasto
+
+#### Selite
+Vaikeasti työllistyvien ryhmään luetaan pitkäaikaistyöttömät, rinnasteiset pitkäaikaistyöttömät, palveluilta työttömäksi jääneet ja palveluilta palveluille siirtyneet.
+
+Pitkäaikaistyöttömät sisältää vähintään vuoden yhdenjaksoisesti työttömänä työnhakijana olleet.
+
+Rinnasteiset pitkäaikaistyöttömät sisältää viimeisen 16 kuukauden aikana yhteensä vähintään 12 kuukautta työttömänä työnhakijana olleet pois luettuna edellä mainitut yhtäjaksoiset pitkäaikaistyöttömät.
+
+Palveluilta työttömäksi jääneisiin lasketaan viimeisen 12 kuukauden aikana työllistettynä, työharjoittelussa tai työelämävalmennuksessa, työvoimakoulutuksessa, vuorotteluvapaasijaisena, kuntouttavassa työtoiminnassa, omaehtoisessa opiskelussa, valmennuksessa sekä työ- tai koulutuskokeilussa olleet, joiden sijoitus on päättynyt 3 kuukautta ennen laskentapäivää ja jotka ovat kuukauden laskentapäivänä työttöminä työnhakijoina.
+
+Palveluilta palveluille sijoittuneisiin lasketaan työllistettynä, työharjoittelussa tai työelämävalmennuksessa, työvoimakoulutuksessa, vuorotteluvapaasijaisena, kuntouttavassa työtoiminnassa, omaehtoisessa opiskelussa, valmennuksessa sekä työ- tai koulutuskokeilussa laskentapäivänä olevat, jotka ovat olleet viimeisen 16 kuukauden aikana em. palveluissa, joka on kuitenkin päättynyt 3 kuukautta ennen laskentapäivänä voimassa olevan palvelun alkua. Lisäksi henkilön on täytynyt olla viimeisen 16 kuukauden aikana yhteensä vähintään 12 kuukautta työttömänä työnhakijana tai em. aktiivipalvelussa.
+
+Sama henkilö voi kuulua vain yhteen vaikeasti työllistyvien ryhmään kerrallaan, koska ryhmät ovat toisensa poissulkevia ja tiedot ovat poikkileikkaustietoja kunkin kuukauden viimeiseltä arkipäivältä. (Lähde: Sotkanet/TEM)
+
+#### Tulkinta
+Vaikeasti työllistyvien osuus työikäisistä kuvaa rakenteellisen työttömyyden kehitystä osana työmarkkinoita.
+
+Vaikeasti työllistyvien osuus työikäisistä kuvaa rakenteellista työttömyyttä. Työttömyyttä voidaan pitää rakenteellisena, jos se ei vähene, vaikka samanaikaisesti työllisyysaste on korkea ja joillakin aloilla vallitsee työvoimapula.
+
+Vaikeasti työllistyvät ovat työikäisiä, jotka liikkuvat työttömyyden, työvoimapoliittisten palveluiden ja lyhyiden työsuhteiden välillä ja heillä on vaikeuksia työllistyä avoimilla työmarkkinoilla. Elinkeinorakenteen muutos ja työelämän vaativuus voivat olla syynä siihen, että työttömän ammatillista osaamista vastaavia työpaikkoja ei ole tarjolla. Lisäksi ikä, vajaakuntoisuus, terveydelliset ja psykososiaaliset ongelmat voivat vaikeuttaa työllistymistä. (Lähde: Sotkanet/TEM)
+Kunta ja valtio yhdessä kustantavat 500 päivää työmarkkinatukea saaneiden perustoimentulon. Kunnalla on tämän lisäksi vastuu näiden henkilöiden viimesijaisesta aktivoinnista, kuntoutuksesta ja terveydenhoidosta. 
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- fread("../Data/rajapinta/data_rakenne.csv", dec=",")
+#data <- setDT(data_rakenne)
+data <- data[Sukupuoli=="Yhteensä" & Koulutusaste=="Yhteensä"]
+data <- data[,c(1,4,5)]
+names(data) <- c("Alue","Kuukausi","Rakennetyöttömät")
+data2 <- dcast(data[,c(1,2,3)], Kuukausi~Alue, value.var="Rakennetyöttömät")
+data2 <- data2[Kuukausi>raja]
+
+kuvaaja8 <- plot_ly(data2, x=~Kuukausi, width=950) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  add_lines(y=~`SK051 Hämeenlinna`, name="Hämeenlinnan seutu", color=I("green")) %>%
+  layout(yaxis=list(title="Rakennetyöttömät"), xaxis=list(title="Kuukausi"))
+kuvaaja8
+```
+
+### Hämeen TE -toimiston asiakastyytyväisyyskyselyt työnhakijoille ja työnantajille
+Lähde: Hämeen TE-toimisto
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- read.csv("../Data/tekyselyt.csv", sep=";", dec=",")
+data2 <- melt(data, id=c("Aika","Kohderyhmä"))
+names(data2)[4] <- "Arvosana"
+kuvaaja9 <- nPlot(Arvosana~Aika, group="Kohderyhmä", type="multiBarChart", data=data2)
+kuvaaja9$chart(stacked=FALSE, showControls = FALSE)
+kuvaaja9$print('Kuvaaja9', include_assets = TRUE)
+```
+
+## 2.2 Asiakasrajapinta: Elinkeinoelämä ja yritykset
+### Työpaikkojen määrä Hämeenlinnan seudulla
+Lähde: Tilastokeskus, Työssäkäynti
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- fread("../Data/rajapinta/data_työpaikat.csv", dec=",")
+#data <- setDT(data_työpaikat)
+names(data) <- c("Kunta", "Toimiala", "Sukupuoli", "Vuosi", "Työpaikat")
+data <- data[Toimiala=="Yhteensä"]
+data <- data[,-2]
+data2 <- dcast(data, Vuosi+Sukupuoli~Kunta, value.var="Työpaikat")
+data2[,Seutu:=Hattula+Janakkala+Hämeenlinna]
+data3 <- melt(data2, id.vars=c("Vuosi","Sukupuoli"), measure.vars=c("Hattula","Hämeenlinna","Janakkala","Seutu"))
+names(data3)[c(3,4)] <- c("Alue","Työpaikat")
+
+data4 <- data3[Alue!="Seutu" & Sukupuoli=="Yhteensä"]
+kuvaaja1a <- nPlot(Työpaikat~Vuosi, group="Alue", type="multiBarChart", data=data4)
+kuvaaja1a$chart(stacked=TRUE, showControls = TRUE)
+kuvaaja1a$print('Kuvaaja1a', include_assets = TRUE)
+
+data5 <- data3[Alue=="Seutu" & Sukupuoli!="Yhteensä"]
+kuvaaja1b <- nPlot(Työpaikat~Vuosi, group="Sukupuoli", type="multiBarChart", data=data5)
+kuvaaja1b$chart(stacked=TRUE, showControls = TRUE)
+#kuvaaja1b$print('Kuvaaja1b', include_assets = TRUE)
+```
+
+### Kuntien elinkeinotoimijoiden tuella uusien yritysten ja yrityskasvun kautta tulleiden työpaikkojen määrä
+Lähde: Linnan kehitys
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- read.csv("../Data/elinkeinotyöpaikat.csv", sep=";")
+data$Vuosi <- as.numeric(data$Vuosi)
+kuvaaja10 <- nPlot(Työpaikat~Vuosi, type="multiBarChart", data=data)
+kuvaaja10$chart(stacked=FALSE, showControls = FALSE)
+kuvaaja10$print('Kuvaaja10', include_assets = TRUE)
+```
+### Aloittaneiden ja lopettaneiden yritysten määrä
+Lähde: Tilastokeskus, Aloittaneet ja lopettaneet yritykset
+
+#### Selite
+Tilasto perustuu Tilastokeskuksen yritysrekisteriin sekä rekisterin lähdeaineistoina käytettävien Verohallinnon rekisteröintitietoihin. Tilasto kattaa yritykset, jotka ovat liiketoiminnasta tai kiinteistön käyttöoikeuden luovutuksesta arvonlisäverovelvollisia tai toimivat työnantajina. Tarkastelun ulkopuolelle jäävät säätiöt, aatteelliset yhdistykset, julkiset viranomaiset ja uskonnolliset yhteisöt. Tilastoon sisältyvät valtion liikelaitokset mutta eivät kuntien liikelaitokset. (Lähde: Tilastokeskus)
+
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- fread("../Data/rajapinta/data_yritykset.csv", dec=",")
+names(data) <- c("Vuosineljännes", "Kunta", "Toimiala", "Aloittaneet", "Lopettaneet", "Yrityskanta")
+data2 <- melt(data, id.vars=c("Vuosineljännes", "Kunta", "Toimiala"), measure.vars=c("Aloittaneet", "Lopettaneet", "Yrityskanta"))
+
+data3 <- dcast(data2, Vuosineljännes~variable+Kunta, value.var="value", fun=sum)
+
+
+kuvaaja101 <- plot_ly(data3, x=~Vuosineljännes, width=950) %>%
+  add_lines(y=~Aloittaneet_Hattula, name="Aloittaneet Hattula", color=I("blue")) %>%
+  add_lines(y=~Lopettaneet_Hattula, name="Lopettaneet Hattula", color=I("magenta")) %>%
+  add_lines(y=~Aloittaneet_Hämeenlinna, name="Aloittaneet Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Lopettaneet_Hämeenlinna, name="Lopettaneet Hämeenlinna", color=I("green")) %>%
+  add_lines(y=~Aloittaneet_Janakkala, name="Aloittaneet Janakkala", color=I("red")) %>%
+  add_lines(y=~Lopettaneet_Janakkala, name="Lopettaneet Janakkala", color=I("black")) %>%
+  layout(yaxis=list(title="lkm"), xaxis=list(title="Vuosineljännes"))
+kuvaaja101
+```
+
+### Yritysten liikevaihdon kehittyminen (1000 euroa)
+Lähde: Tilastokeskus, Alueellinen yritystoimintatilasto
+
+#### Selite
+Alueellinen yritystoimintatilasto sisältää tietoja maassamme toimivien yritysten toimipaikoista toimialoittain ja alueittain. Tilasto kattaa kaikkien aktiivisten yritysten toimipakat. (Lähde: Tilastokeskus)
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- fread("../Data/rajapinta/data_liikevaihto.csv", dec=",")
+names(data) <- c("Vuosi", "Kunta", "Toimipaikat", "Henkilöstö", "Liikevaihto", "LiikevaihtoHlö")
+data2 <- data[,c(1,2,5)]
+#data2$Liikevaihto <- 1000*data2$Liikevaihto
+data3 <- dcast(data2, Vuosi~Kunta, value.var="Liikevaihto")
+
+kuvaaja102 <- plot_ly(data3, x=~Vuosi, width=950) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  layout(yaxis=list(title="1000 euroa"), xaxis=list(title="Vuosi"))
+kuvaaja102
+```
+
+## 2.3 Työllistymistä tukeva ja edistävä toiminta: Koulutus, kehittäminen ja osaaminen
+### Toiselta asteelta ja HAMKista vuosittain valmistuneet
+Lähde: Vipunen, Opetushallinnon tilastopalvelu
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- read.csv("../Data/valmistuneet.csv", sep=";")
+data2 <- melt(data, id="Vuosi")
+names(data2) <- c("Vuosi", "Koulu", "Valmistuneet")
+kuvaaja11 <- nPlot(Valmistuneet~Vuosi, group="Koulu", type="lineChart", data=data2)
+kuvaaja11$print('Kuvaaja11', include_assets = TRUE)
+```
+
+### Toisen asteen ja HAMK:n ensisijaiset hakijat suhteessa paikan vastaanottaneisiin
+Lähde: Vipunen, Opetushallinnon tilastopalvelu
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- read.csv("../Data/hakijat.csv", sep=";")
+data2 <- melt(data, id=c("Vuosi","Oppilaitos"))
+names(data2) <- c("Vuosi", "Koulu", "Muuttuja", "Hakijat")
+data2$ryhmä <- paste(data2$Koulu, data2$Muuttuja, sep=" ")
+kuvaaja12 <- nPlot(Hakijat~Vuosi, group="ryhmä", type="lineChart", data=data2)
+kuvaaja12$print('Kuvaaja12', include_assets = TRUE)
+```
+
+### HAMK:n vuosittaiset TK-panostukset ja ulkopuolinen rahoitus (1000 euroa)
+Lähde: Vipunen, Opetushallinnon tilastopalvelu
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- read.csv("../Data/tkrahoitus.csv", sep=";")
+data2 <- melt(data, id="Vuosi")
+names(data2) <- c("Vuosi", "Laatu", "Rahoitus")
+kuvaaja13 <- nPlot(Rahoitus~Vuosi, group="Laatu", type="lineChart", data=data2)
+kuvaaja13$print('Kuvaaja13', include_assets = TRUE)
+```
+
+### Korkea-asteen tutkinnon suorittaneiden osuus 15v täyttäneistä
+Lähde: Tilastokeskus, Väestön koulutusrakenne
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- fread("../Data/rajapinta/data_koulutus.csv", dec=",")
+names(data) <- c("Vuosi", "Kunta", "Ikä", "Sukupuoli", "Osuus")
+data2 <- data[Ikä=="Yhteensä"]
+data3 <- dcast(data2, Vuosi~Kunta, value.var="Osuus")
+
+kuvaaja103 <- plot_ly(data3, x=~Vuosi, width=950) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  layout(yaxis=list(title="Korkeakoulutettujen osuus %"), xaxis=list(title="Vuosi"))
+kuvaaja103
+```
+
+### Ulkomaalaisten työttömien määrä
+Lähde: Työ- ja elinkeinoministeriö, Työnvälitystilasto
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- fread("../Data/rajapinta/data_ulkomaalaiset.csv", dec=",")
+names(data) <- c("Alue","Kuukausi","Työttömät","Työvoima","Osuus")
+data2 <- dcast(data, Kuukausi~Alue, value.var="Työttömät")
+data2 <- data2[Kuukausi>raja]
+
+kuvaaja104 <- plot_ly(data2, x=~Kuukausi, width=950) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~`SK051 Hämeenlinna`, name="Hämeenlinnan seutu", color=I("blue")) %>%
+  layout(yaxis=list(title="Työttömät työnhakijat"), xaxis=list(title="Kuukausi"))
+kuvaaja104
+```
+
+### Toisen asteen osatutkintojen määrä
+Lähde: kkTavastia ja Hami
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- read.csv("../Data/osatutkinnot.csv", sep=";", dec=",")
+data2 <- melt(data, id=c("Vuosi","Oppilaitos"))
+names(data2)[4] <- "Osatutkinnot"
+kuvaaja14 <- nPlot(Osatutkinnot~Vuosi, group="Oppilaitos", type="multiBarChart", data=data2)
+kuvaaja14$chart(stacked=FALSE, showControls = FALSE)
+kuvaaja14$print('Kuvaaja14', include_assets = TRUE)
+```
+
+## 2.4 Työllistymistä tukeva ja edistävä toiminta: Sosiaali- ja terveydenhuolto
+### Rakennetyöttömien määrä
+Lähde: Työ- ja elinkeinoministeriö, Työnvälitystilasto
+
+[Ks. edellä rakennetyöttömien määrä](#rakennetyöttömien-määrä)
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+
+```
+
+### Kuntouttavan työtoiminnan asiakkaat
+Lähde: Kunnat
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+#data <- read.csv("../Data/kuntouttava.csv", sep=";")
+data <- fread("../Data/rajapinta/data_palveluissa.csv", dec=",")
+data2 <- data[,c(1,2,3,4,13)]
+names(data2)[5] <- "Asiakkaat"
+data3 <- data2[Alue!="KOKO MAA" & Sukupuoli=="Yhteensä" & Ikäryhmät=="Yhteensä" & Kuukausi>raja]
+data4 <- dcast(data3, Kuukausi~Alue, value.var="Asiakkaat")
+
+kuvaaja107 <- plot_ly(data4, x=~Kuukausi, width=950) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  add_lines(y=~`SK051 Hämeenlinna`, name="Hämeenlinnan seutu", color=I("green")) %>%
+  layout(yaxis=list(title="Asiakkaat"), xaxis=list(title="Kuukausi"))
+kuvaaja107
+```
+
+### Kompassi-arvioinnin kautta asiakkaiden toimintakykyisyys KESKEN
+Hämeenlinnan kaupungin kuntoutuksellisissa työllisyyspalveluissa käytetään Kompassia, jota kautta saadaan tietoa asiakkaan tilanteesta ja tarpeista suhteessa toiminta- ja työkykyyn. Tällä hetkellä Kompassista ei saada vielä tietoa laajasta asiakasmäärästä. Tiedot lisätään lähitulevaisuudessa. 
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+
+```
+
+### Perustoimeentulotuen saajien määrä
+Lähde: Kunnat (2016 asti), Kela (2017 alkaen) -> THL Sotkanet
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+#data <- read.csv("../Data/perustoimeentulotuki.csv", sep=";")
+#kuvaaja16 <- hPlot(Kotitaloudet~Vuosi, group="Kunta", type="line", data=data)
+#kuvaaja16$print('Kuvaaja16', include_assets = TRUE)
+aluejaot <- c("KUNTA", "MAA", "SEUTUKUNTA", "MAAKUNTA")
+vuodet <- c(1991:2018)
+alueet <- c("Hattula", "Hämeenlinna", "Janakkala", "Hämeenlinnan seutukunta")
+data <- GetDataSotkanet(4019, region.category = aluejaot, years=vuodet, region = alueet)
+data2 <- setDT(data[,c(2,7,9)])
+names(data2) <- c("Alue", "Vuosi", "Saajat")
+data3 <- dcast(data2, Vuosi~Alue, value.var="Saajat")
+
+kuvaaja109 <- plot_ly(data3[Vuosi>2009], x=~Vuosi, width=950) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  add_lines(y=~`Hämeenlinnan seutukunta`, name="Hämeenlinnan seutu", color=I("green")) %>%
+  layout(yaxis=list(title="Perustoimeentulotuen saajat"), xaxis=list(title="Vuosi"))
+kuvaaja109
+```
+
+### Työkyvyttömyyseläkettä saavat 16-64 -vuotiaat
+Lähde: Sotkanet
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+aluejaot <- c("KUNTA", "MAA", "SEUTUKUNTA", "MAAKUNTA")
+vuodet <- c(1991:2017)
+alueet <- c("Hattula", "Hämeenlinna", "Janakkala", "Hämeenlinnan seutukunta", "Kanta-Häme", "Koko maa")
+data <- GetDataSotkanet(2424, region.category = aluejaot, years=vuodet, region = alueet)
+data2 <- setDT(data[,c(2,7,9)])
+names(data2) <- c("Alue", "Vuosi", "Työkyvyttömyys")
+data3 <- dcast(data2, Vuosi~Alue, value.var="Työkyvyttömyys")
+
+kuvaaja108 <- plot_ly(data3[Vuosi>2004], x=~Vuosi, width=950) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  add_lines(y=~`Koko maa`, name="Koko maa", color=I("black")) %>%
+  add_lines(y=~`Hämeenlinnan seutukunta`, name="Hämeenlinnan seutu", color=I("green")) %>%
+  layout(yaxis=list(title="Työkyvyttömyys %"), xaxis=list(title="Vuosi"))
+kuvaaja108
+```
+
+# 3 Työllistymistä tukeva ja edistävä toimintaympäristö
+
+## 3.1 Rakenne ennakoinnille
+### PK-yritysten suhdannenäkymät
+Lähde: Suomen yrittäjät, PK-yritysbarometri
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+#data <- read.csv("../Data/suhdanteet.csv", sep=";")
+#data$Saldoluku <- as.numeric(data$Saldoluku)
+data <- fread("../Data/suhdanteet.csv", dec=",")
+data2 <- dcast(data, Aika~Alue, value.var="Saldoluku")
+
+kuvaaja110 <- plot_ly(data2, x=~Aika, width=950) %>%
+  add_lines(y=~`Koko maa`, name="Koko maa", color=I("black")) %>%
+  add_lines(y=~`Hämeenlinnan seutu`, name="Hämeenlinnan seutu", color=I("green")) %>%
+  layout(yaxis=list(title="Saldoluku"), xaxis=list(title="Vuosi"))
+kuvaaja110
+#kuvaaja17 <- nPlot(Saldoluku~Aika, group="Alue", type="lineChart", data=data)
+#kuvaaja17$print('Kuvaaja17', include_assets = TRUE)
+```
+
+### Elinkeinorakenteen monipuolisuus
+Lähde: Tilastokeskus, Työssäkäynti
+
+```{r echo=F, message=F, warning=F, results='asis', comment=NA, fig.height=700}
+#data <- setDT(data_työpaikat)
+data <- fread("../Data/rajapinta/data_työpaikat.csv", dec=",")
+names(data) <- c("Kunta", "Toimiala", "Sukupuoli", "Vuosi", "Työpaikat")
+data <- data[Toimiala!="Yhteensä" & Vuosi=="2017"]
+data2 <- dcast(data, Vuosi+Toimiala+Sukupuoli~Kunta, value.var="Työpaikat")
+data2[,Seutu:=Hattula+Janakkala+Hämeenlinna]
+data2 <- data2[,-c(1,4,5,6)]
+data3 <- melt(data2, id.vars=c("Toimiala","Sukupuoli"), measure.vars="Seutu")
+data4 <- dcast(data3, Toimiala~Sukupuoli, value.var="value")
+data4[,Osuus:=100*(Miehet/Yhteensä)]
+data4[20,1] <- "T Kotitalouksien toiminta työnantajina"
+
+
+kuvaaja2a <- amBarplot(x="Toimiala", y=c("Naiset", "Miehet"), data=data4, horiz=TRUE, stack_type="regular") %>%
+  amOptions()
+  #, legend=TRUE, legendPosition="bottom")
+
+
+#kuvaaja2a <- plot_ly(data=data4, names=~Toimiala, values=~Yhteensä, type="treemap") 
+#data2 <- data2[Sukupuoli!="Yhteensä"]
+#kuvaaja2a <- nPlot(Seutu~Toimiala, group="Sukupuoli", type="multiBarChart", data=data2)
+#, width=1000, height=800)
+#kuvaaja2a$chart(stacked=TRUE, showControls = TRUE, margin=c(top=0, right=0, bottom=500, left=200, unit="pt"), rotateLabels=-40, reduceXTicks=FALSE)
+#kuvaaja2a$xAxis()
+#$print('Kuvaaja2a', include_assets = TRUE)
+kuvaaja2a
+
+```
+
+## 3.2 Hämeenlinnan seudun sijaintietu
+### Seudun väkiluvun kehittyminen
+#### Väestö ikävuosittain Hämeenlinnan seudulla
+Lähde: Tilastokeskus, Väestörakenne
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- fread("../Data/rajapinta/data_väestö.csv", dec=",")
+#data <- setDT(data_väestö)
+names(data)[5] <- "Väestö"
+
+#Väestöpyramidi seudullisesti
+data2 <- data[Sukupuoli!="Yhteensä" & Vuosi==2019 & Ikä!="Yhteensä"]
+data2[Ikä=="100 -", Ikä:="100"]
+data2 <- data2[,-4]
+data2 <- dcast(data2, Ikä+Sukupuoli~Alue, value.var="Väestö")
+data2[,Väestö:=Hattula+Janakkala+Hämeenlinna]
+data3 <- data2[,c(1,2,6)]
+data4 <- dcast(data3, Ikä~Sukupuoli, value.var="Väestö")
+data4[,Ikä:=as.numeric(Ikä)]
+data4 <- data4[order(Ikä)]
+#data4[,Naiset:=-Naiset]
+data4[,Ikä:=as.character(Ikä)]
+data5 <- melt(data4, id.vars="Ikä", measure.vars=c("Naiset", "Miehet"))
+
+kuvaaja3a <- amBarplot(x="Ikä", y=c("Naiset", "Miehet"), data=data4, stack_type="regular")
+kuvaaja3a
+#, horiz=TRUE
+```
+
+#### Väkiluvun kehittyminen vuosittain
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+#Väestönkehitys seudun kunnittain työikäiset vs koko väestö?
+data2 <- data[Sukupuoli=="Yhteensä" & Ikä=="Yhteensä" & Vuosi > 1999]
+data2 <- data2[,-3]
+data3 <- dcast(data2, Vuosi~Alue, value.var="Väestö")
+
+kuvaaja106 <- plot_ly(data3, x=~Vuosi, width=950) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  layout(yaxis=list(title="Väkiluku"), xaxis=list(title="Vuosi"))
+kuvaaja106
+```
+
+### Palkansaajien maksamat kunnallisverot
+Lähde: Tilastokeskus, Veronalaiset tulot
+```{r echo=F, message=F, warning=F, results='asis', comment=NA}
+data <- fread("../Data/rajapinta/data_verotulot.csv", dec=",")
+names(data) <- c("Vuosi", "Kunta", "Tulonsaajia", "Vero")
+data[,Kunnallisvero:=Tulonsaajia*Vero]
+data2 <- dcast(data, Vuosi~Kunta, value.var="Kunnallisvero")
+
+kuvaaja105 <- plot_ly(data2, x=~Vuosi, width=950) %>%
+  add_lines(y=~Hattula, name="Hattula", color=I("blue")) %>%
+  add_lines(y=~Hämeenlinna, name="Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~Janakkala, name="Janakkala", color=I("red")) %>%
+  layout(yaxis=list(title="Kunnallisvero"), xaxis=list(title="Vuosi"))
+kuvaaja105
+```
+
+

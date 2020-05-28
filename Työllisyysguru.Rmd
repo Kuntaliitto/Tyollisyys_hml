@@ -1,0 +1,614 @@
+---
+title: "Työllisyysguru"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+params: 
+  output_dir: "../Raportit"
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE, message=F, warning=F}
+#Asetetaan työskentelykansioksi .Rmd-tiedoston tallennuskansio
+setwd(getwd())
+#Otetaan käyttöön tarpeellisia kirjastoja, tarpeettomat kommentoitu pois
+#Dashboardin luomiseen
+library(flexdashboard)
+#Datojen käsittely tapahtuu data.table-objekteilla data.frame sijaan
+#katso https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.html
+library(data.table)
+#kuvaajat pääasiassa plotly
+library(plotly)
+#tekstimuotoisen datan käsittely
+library(stringr)
+#taulukon rakentamiseen
+library(DT)
+library(rAmCharts)
+#library(rCharts)
+library(reshape)
+#library(plyr)
+#library(dplyr)
+library(RColorBrewer)
+#RColorBrewerin väriskaalat
+#display.brewer.all()
+#Aikamääreitä raportin oikeiden ajankohtien määrittämiseen
+raja <- "2014M12"
+raja2 <- "2019M03"
+kknyt <- "2020-04"
+kked <- "2020-03"
+kkloppu <- "M04"
+kked2 <- "2020M03"
+```
+
+```{r echo=F, message=F, warning=F, results='asis', comment=NA} 
+#Haetaan dataa
+#Yhteen koottavat datat
+#Rakennetyöttömät, pitkäaikaistyöttömät
+data_rakenne <- fread("../Data/rajapinta/data_rakenne.csv", dec=",")
+data_rakenne2 <- data_rakenne[Kuukausi>raja & Sukupuoli=="Yhteensä" & Koulutusaste=="Yhteensä"]
+data_rakenne2 <- data_rakenne2[,c(4,1,5,6)]
+names(data_rakenne2)[3:4] <- c("Rakennetyöttömät", "Pitkäaikaistyöttömät") 
+data_rakenne2 <- melt(data_rakenne2, id.vars=c("Kuukausi","Alue"))
+
+#Ulkomaalaiset
+data_ulkomaalaiset <- fread("../Data/rajapinta/data_ulkomaalaiset.csv", dec=",")
+data_ulkomaalaiset2 <- data_ulkomaalaiset[Kuukausi>raja,c(2,1,3,4,5)]
+names(data_ulkomaalaiset2) <- c("Kuukausi", "Alue", "Ulkomaalaiset", "UlkomaalainenTyövoima", "UlkomaalaisetAste")
+data_ulkomaalaiset2 <- melt(data_ulkomaalaiset2, id.vars=c("Kuukausi","Alue"))
+
+#Työttömät työnhakijat ikäryhmittäin -> alle 25, alle 30
+data_ikäryhmät <- fread("../Data/rajapinta/data_ikäryhmät.csv", dec=",")
+data_ikäryhmät2 <- data_ikäryhmät[Kuukausi>raja & Sukupuoli=="Yhteensä",c(1,3,5,6)]
+data_ikäryhmät2 <- dcast(data_ikäryhmät2, Kuukausi+Alue~Ikäryhmät, value.var="Työnhakijoita laskentapäivänä")
+data_ikäryhmät2[,Alle25v:=data_ikäryhmät2[,3]+data_ikäryhmät2[,4]]
+data_ikäryhmät2[,Alle30v:=Alle25v+data_ikäryhmät2[,5]]
+data_ikäryhmät2 <- data_ikäryhmät2[,c(1,2,3,14:16)]
+names(data_ikäryhmät2)[3:4] <- c("Alle20v", "Työttömät")
+data_ikäryhmät2 <- melt(data_ikäryhmät2, id.vars=c("Kuukausi","Alue"))
+
+#Työttömyysaste, yli 50v työttömät, työpaikat ja työnhakijat
+data_perustiedot <- fread("../Data/rajapinta/data_perustiedot.csv", dec=",")
+data_perustiedot2 <- data_perustiedot[Kuukausi>raja ,c(1,2,3,6,11,12,15,16,24,25)]
+names(data_perustiedot2) <- c("Alue", "Kuukausi", "Työnhakijat", "Työttömyysaste", "Yli50v", "Pitkäaikaissairaat", "Kassa", "Lomautettu", "AvoimetTyöpaikat", "UudetAvoimet")
+data_perustiedot2 <- melt(data_perustiedot2, id.vars=c("Kuukausi","Alue"))
+
+#Työttömyyden kesto
+data_kesto <- fread("../Data/rajapinta/data_kesto.csv", dec=",")
+data_kesto2 <- data_kesto[Kuukausi>raja & Ikäryhmitys=="Yhteensä" & Sukupuoli=="Yhteensä" ,c(1,5,7)]
+names(data_kesto2)[3] <- "TyönhaunKesto"
+data_kesto2 <- melt(data_kesto2, id.vars=c("Kuukausi","Alue"))
+
+#TMT-kuntaosuudet, raakadata koostettu käsin Kelaston tulosteesta, datassa sarakkeet
+#"Kuukausi" "SaajatYhteensä" "EtuudetYhteensä" "PäivätYhteensä" "OsuusYhteensä" "Saajat300" "Etuudet300" "Päivät200" "Osuus300" "Saajat500"       "Etuudet500" "Päivät500" "Osuus500" "Saajat1000" "Etuudet1000" "Päivät1000" "Osuus1000"
+#Vastaavan datan voi hakea osoitteesta http://raportit.kela.fi/ibi_apps/WFServlet?IBIF_ex=NIT089CL
+#Raporttiin valitaan tieto-kentästä ja työmarkkinatukipäivien kertymä -kentästä kaikki arvot, valitaan oikea(t) alue ja asetetaan työmarkkinatukipäivien kertymä sarakkeille
+#Datan sarakeotsikoita on muokattu käsin
+data_tmt <- fread("../Data/tmtmaksut.csv", dec=",")
+data_tmt2 <- melt(data_tmt, id.vars="Kuukausi")
+data_tmt2$Alue <- "Hämeenlinna"
+data_tmt2 <- data_tmt2[,c(1,4,2,3)]
+
+#Työttömyysprosentit
+data_pros <- fread("../Data/rajapinta/data_perustiedot.csv", dec=",")
+data_pros2 <- data_pros[Kuukausi>raja & !(Alue=="Hattula" | Alue=="Janakkala") ,c(2,1,6)]
+names(data_pros2)[3] <- "TyöttömienOsuus"
+data_pros2 <- melt(data_pros2, id.vars=c("Kuukausi", "Alue"), measure.vars="TyöttömienOsuus")
+data_pros_u <- fread("../Data/rajapinta/data_ulkomaalaiset.csv", dec=",")
+data_pros_u2 <- data_pros_u[Kuukausi>raja & !(Alue=="Hattula" | Alue=="Janakkala"),c(2,1,5)]
+names(data_pros_u2)[3] <- "UlkomaalaistenOsuus"
+data_pros_u2 <- melt(data_pros_u2, id.vars=c("Kuukausi", "Alue"), measure.vars="UlkomaalaistenOsuus")
+data_pitkä2 <- rbindlist(list(data_pros2, data_pros_u2))
+
+#Koostetaan yksi pitkä data ja siitä edelleen toinen vain Hämeenlinnaa koskevista tiedoista
+data_pitkä_kaikki <- rbindlist(list(data_rakenne2, data_ulkomaalaiset2, data_ikäryhmät2, data_perustiedot2,data_kesto2, data_tmt2, data_pitkä2))
+data_pitkä <- data_pitkä_kaikki[Alue=="Hämeenlinna"]
+
+#Erilliset datat
+data_virta <- fread("../Data/rajapinta/data_virta.csv", dec=",")
+data_virta <- data_virta[Kuukausi>raja & Alue=="Hämeenlinna"]
+data_palveluissa <- fread("../Data/rajapinta/data_palveluissa.csv", dec=",")
+data_palveluissa <- data_palveluissa[Kuukausi>raja & Alue=="Hämeenlinna" & Sukupuoli=="Yhteensä" & Ikäryhmät=="Yhteensä"]
+
+#Työttömyyden kesto ikäryhmittäin
+data_kesto_ikä <- fread("../Data/rajapinta/data_kesto2.csv", dec=",")
+
+#Työttömät ikäryhmittäin x sukupuolittain / työnhakijat ryhmiteltynä
+data_työnhakijat <- fread("../Data/rajapinta/data_työnhakijat.csv", dec=",")
+
+#Työttömät koulutustason mukaan
+data_koulutustaso <- fread("../Data/rajapinta/data_koulutustaso.csv", dec=",")
+
+#Työnhakijat ryhmittäin
+data_työnhakijat2 <- fread("../Data/rajapinta/data_työnhakijat2.csv", dec=",")
+
+#Työnhakijat ja avoimet työpaikat ammateittain
+data_ammattialat <- fread("../Data/rajapinta/data_ammattialat.csv", dec=",")
+
+```
+
+Etusivu
+=====================================
+
+Row
+-----------------------------------------------------------------------
+### Työttömät työnhakijat
+
+```{r}
+valueBox(data_pitkä[Kuukausi==max(Kuukausi) & variable=="Työttömät", value], icon = "body-outline")
+```
+
+### Nuorisotyöttömät
+
+```{r}
+valueBox(data_pitkä[Kuukausi==max(Kuukausi) & variable=="Alle25v", value], icon = "fa-comments", color = "warning")
+```
+
+### Avoimet työpaikat
+
+```{r}
+valueBox(data_pitkä[Kuukausi==max(Kuukausi) & variable=="AvoimetTyöpaikat", value], icon = "fa-trash")
+```
+
+### Työttömyysaste
+
+```{r}
+valueBox(data_pitkä[Kuukausi==max(Kuukausi) & variable=="Työttömyysaste", value], icon = "fa-pencil")
+```
+
+### Työttömyyden kesto vko
+
+```{r}
+valueBox(data_pitkä[Kuukausi==max(Kuukausi) & variable=="TyönhaunKesto", value], icon = "fa-comments", color = "warning")
+```
+
+
+Row
+-----------------------------------------------------------------------
+
+### Työttömät eri ryhmissä
+
+```{r}
+data <- dcast(data_pitkä, Kuukausi~variable, value.var="value")
+
+kuvaaja1 <- plot_ly(data, x=~Kuukausi) %>%
+  add_lines(y=~Työttömät, name="Työttömät työnhakijat", color=I("blue")) %>%
+  add_lines(y=~Rakennetyöttömät, name="Rakennetyöttömät", color=I("orange")) %>%
+  add_lines(y=~Pitkäaikaistyöttömät, name="Pitkäaikaistyöttömät", color=I("red")) %>%
+  add_lines(y=~Alle30v, name="Alle 30v työttömät", color=I("magenta")) %>%
+  add_lines(y=~Alle25v, name="Alle 25v työttömät", color=I("green")) %>%
+  add_lines(y=~Yli50v, name="Yli 50v työttömät", color=I("black")) %>%
+  add_lines(y=~Ulkomaalaiset, name="Ulkomaalaiset työttömät", color=I("lightblue")) %>%
+  add_lines(y=~Lomautettu, name="Lomautettu", color=I("blueviolet")) %>%
+  layout(yaxis=list(title="Työttömät"), xaxis=list(title="Kuukausi"))
+kuvaaja1
+```
+
+### Työmarkkinatuen kuntaosuudet
+
+```{r}
+data <- dcast(data_pitkä, Kuukausi~variable, value.var="value")
+data2 <- data[,c("Kuukausi", "OsuusYhteensä")]
+data2$OsuusYhteensä <- round(data2$OsuusYhteensä/1000,0)*1000
+data2[,Vuosi:=paste("Vuosi",str_sub(Kuukausi,1,4))]
+data2[,kk:=paste("Kuukausi",str_sub(Kuukausi,6,7))]
+data2$Vuosi <- str_remove(data2$Vuosi, " ")
+data3 <- dcast(data2, kk~Vuosi, value.var="OsuusYhteensä")
+data3$kk[data3$kk=="Kuukausi 01"] <- "01 Tammikuu"
+data3$kk[data3$kk=="Kuukausi 02"] <- "02 Helmikuu"
+data3$kk[data3$kk=="Kuukausi 03"] <- "03 Maaliskuu"
+data3$kk[data3$kk=="Kuukausi 04"] <- "04 Huhtikuu"
+data3$kk[data3$kk=="Kuukausi 05"] <- "05 Toukokuu"
+data3$kk[data3$kk=="Kuukausi 06"] <- "06 Kesäkuu"
+data3$kk[data3$kk=="Kuukausi 07"] <- "07 Heinäkuu"
+data3$kk[data3$kk=="Kuukausi 08"] <- "08 Elokuu"
+data3$kk[data3$kk=="Kuukausi 09"] <- "09 Syyskuu"
+data3$kk[data3$kk=="Kuukausi 10"] <- "10 Lokakuu"
+data3$kk[data3$kk=="Kuukausi 11"] <- "11 Marraskuu"
+data3$kk[data3$kk=="Kuukausi 12"] <- "12 Joulukuu"
+
+kuvaaja2 <- plot_ly(data3, x=~kk) %>%
+  add_lines(y=~Vuosi2015, name="Vuosi 2015", color=I("blue")) %>%
+  add_lines(y=~Vuosi2016, name="Vuosi 2016", color=I("orange")) %>%
+  add_lines(y=~Vuosi2017, name="Vuosi 2017", color=I("red")) %>%
+  add_lines(y=~Vuosi2018, name="Vuosi 2018", color=I("magenta")) %>%
+  add_lines(y=~Vuosi2019, name="Vuosi 2019", color=I("green")) %>%
+  add_lines(y=~Vuosi2020, name="Vuosi 2020", color=I("black")) %>%
+  layout(yaxis=list(title="TMT kuntaosuus 1000 €"), xaxis=list(title="Kuukausi"))
+kuvaaja2
+```
+
+
+Yleiskuva {data-orientation=columns}
+=====================================
+Column
+-----------------------------------------------------------------------
+
+### Työnhakijat työllisyyskoodin mukaan
+```{r}
+data <- data_työnhakijat2[(str_sub(data_työnhakijat2$Kuukausi,5,7)==kkloppu & Kuukausi>raja) & Työllisyyskoodi!="Yhteensä", c(4:6)]
+names(data)[3] <- "Työnhakijat"
+data2 <- dcast(data, Kuukausi~Työllisyyskoodi, value.var="Työnhakijat")
+#names(data2) "Kuukausi" "Koulutuksessa" "Lomautettu" "Lyhennetyllä työvkolla" "Tuntematon" "Työllistetty" "Työllistym. ed. palvelussa" "Työssä yleisillä työmarkk." "Työttömyyseläkkeellä" "Työtön" "Työvoiman ulkopuolella"  
+names(data2) <- c("Kuukausi", "Koulutuksessa", "Lomautettu", "LyhennettyTyöviikko", "Tuntematon", "Työllistetty", "Palveluissa", "YleisetTyömarkkinat", "Työttömyyseläke", "Työtön", "TyövoimanUlkopuolella")
+
+kuvaaja103 <- plot_ly(data2, x=~Kuukausi) %>%
+  add_lines(y=~Koulutuksessa, name="Koulutuksessa", color=I("blue")) %>%
+  add_lines(y=~Lomautettu, name="Lomautettu", color=I("orange")) %>%
+  add_lines(y=~LyhennettyTyöviikko, name="Lyhennetyllä työvkolla", color=I("red")) %>%
+  add_lines(y=~Tuntematon, name="Tuntematon", color=I("magenta")) %>%
+  add_lines(y=~Työllistetty, name="Työllistetty", color=I("green")) %>%
+  add_lines(y=~Palveluissa, name="Työllistym. ed. palvelussa", color=I("black")) %>%
+  add_lines(y=~YleisetTyömarkkinat, name="Työssä yleisillä työmarkk.", color=I("lightblue")) %>%
+  add_lines(y=~Työttömyyseläke, name="Työttömyyseläkkeellä", color=I("blueviolet")) %>%
+  add_lines(y=~Työtön, name="Työtön", color=I("brown")) %>%
+  add_lines(y=~TyövoimanUlkopuolella, name="Työvoiman ulkopuolella", color=I("yellow")) %>%
+  layout(yaxis=list(title="Työnhakijat"), xaxis=list(title="Kuukausi"))
+kuvaaja103
+
+```
+
+### Avoimet työpaikat ja työttömät työnhakijat
+```{r}
+#4
+data <- dcast(data_pitkä, Kuukausi~variable, value.var="value")
+
+kuvaaja4 <- plot_ly(data, x=~Kuukausi) %>%
+  add_lines(y=~Työttömät, name="Työttömät työnhakijat", color=I("blue")) %>%
+  add_lines(y=~Työnhakijat, name="Työnhakijat", color=I("orange")) %>%
+  add_lines(y=~AvoimetTyöpaikat, name="Avoimet työpaikat", color=I("green")) %>%
+  add_lines(y=~UudetAvoimet, name="Uudet avoimet työpaikat", color=I("magenta")) %>%
+  layout(yaxis=list(title="Lkm"), xaxis=list(title="Kuukausi"))
+kuvaaja4
+
+```
+
+Column
+-----------------------------------------------------------------------
+
+### Työttömyysasteet Hämeenlinnassa ja vertailualueilla
+
+```{r}
+#10
+data <- dcast(data_pitkä2, Kuukausi~Alue+variable, value.var="value")
+names(data) <- c("Kuukausi", "T_Hämeenlinna", "U_Hämeenlinna", "T_KokoMaa", "U_KokoMaa", "T_Seutu", "U_Seutu")
+
+kuvaaja3 <- plot_ly(data, x=~Kuukausi) %>%
+  add_lines(y=~T_Hämeenlinna, name="Työttömyysaste Hämeenlinna", color=I("blue")) %>%
+  add_lines(y=~U_Hämeenlinna, name="Ulkom. työttömyysaste Hämeenlinna", color=I("orange")) %>%
+  add_lines(y=~T_KokoMaa, name="Työttömyysaste koko maa", color=I("red")) %>%
+  add_lines(y=~U_KokoMaa, name="Ulkom. työttömyysaste koko maa", color=I("magenta")) %>%
+  add_lines(y=~T_Seutu, name="Työttömyysaste HML seutu", color=I("green")) %>%
+  add_lines(y=~U_Seutu, name="Ulkom. työttömyysaste seutu", color=I("black")) %>%
+  layout(yaxis=list(title="Työttömyysaste %"), xaxis=list(title="Kuukausi"))
+kuvaaja3
+```
+
+### Avoimet työpaikat ja työnhakijat ammattialoittain
+```{r}
+data <- data_ammattialat[Kuukausi==max(Kuukausi), -c(1,3)]
+
+datatable(data, options=list(pageLength=20))
+
+```
+
+Taulukko
+=====================================
+### Keskeiset työllisyysluvut
+
+```{r}
+#Taulukko
+options(stringsAsFactors = FALSE)
+data <- data_pitkä_kaikki
+#Valitaan dataan kaikkien vuosien vastaavat ajankohdat (kkloppu, esim. "M02") ja edellinen kuukausi esim. "2020M01"
+data2 <- data[(str_sub(data$Kuukausi,5,7)==kkloppu | Kuukausi==kked2)]
+
+#Luodaan taulukon rivit
+a = c("Työttömyysaste", "Hämeenlinna",data2[variable=="Työttömyysaste" & Alue=="Hämeenlinna", value])
+b = c("Työttömyysaste", "Hämeenlinnan seutu",data2[variable=="Työttömyysaste" & Alue=="SK051 Hämeenlinna", value])
+c = c("Työttömyysaste", "Koko maa",data2[variable=="Työttömyysaste" & Alue=="KOKO MAA", value])
+d = c("Ulkomaalaisten työttömyysaste", "Hämeenlinna",data2[variable=="UlkomaalaisetAste" & Alue=="Hämeenlinna", value])
+e = c("Ulkomaalaisten työttömyysaste", "Hämeenlinnan seutu",data2[variable=="UlkomaalaisetAste" & Alue=="SK051 Hämeenlinna", value])
+f = c("Ulkomaalaisten työttömyysaste", "Koko maa",data2[variable=="UlkomaalaisetAste" & Alue=="KOKO MAA", value])
+g = c("Työttömät", "Hämeenlinna",data2[variable=="Työttömät" & Alue=="Hämeenlinna", value])
+h = c("Lomautettu", "Hämeenlinna",data2[variable=="Lomautettu" & Alue=="Hämeenlinna", value])
+i = c("Ulkomaalaiset työttömät", "Hämeenlinna",data2[variable=="Ulkomaalaiset" & Alue=="Hämeenlinna", value])
+j = c("Rakennetyöttömät", "Hämeenlinna",data2[variable=="Rakennetyöttömät" & Alue=="Hämeenlinna", value])
+k = c("Pitkäaikaistyöttömät", "Hämeenlinna",data2[variable=="Pitkäaikaistyöttömät" & Alue=="Hämeenlinna", value])
+l = c("Alle 20-vuotiaat työttömät", "Hämeenlinna",data2[variable=="Alle20v" & Alue=="Hämeenlinna", value])
+m = c("Alle 25-vuotiaat työttömät", "Hämeenlinna",data2[variable=="Alle25v" & Alue=="Hämeenlinna", value])
+n = c("Alle 30-vuotiaat työttömät", "Hämeenlinna",data2[variable=="Alle30v" & Alue=="Hämeenlinna", value])
+o = c("Kunnan tmt-osuuden saajat", "Hämeenlinna",data2[variable=="SaajatYhteensä" & Alue=="Hämeenlinna", value])
+p = c("Kunnan tmt-osuus", "Hämeenlinna",data2[variable=="OsuusYhteensä" & Alue=="Hämeenlinna", value])
+q = c("Avoimet työpaikat", "Hämeenlinna",data2[variable=="AvoimetTyöpaikat" & Alue=="Hämeenlinna", value])
+r = c("Uudet avoimet työpaikat", "Hämeenlinna",data2[variable=="UudetAvoimet" & Alue=="Hämeenlinna", value])
+
+#kootaan taulukosta matriisi ja väliaikaisesti data.frame, jonka kautta edelleen data.table
+taulukko <- rbind(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r)
+t <- setDT(as.data.frame(taulukko))
+#Muokataan vielä datan saraketyypit
+t$V1 <- as.character(t$V1)
+t$V2 <- as.character(t$V2)
+t$V3 <- as.numeric(t$V3)
+t$V4 <- as.numeric(t$V4)
+t$V5 <- as.numeric(t$V5)
+t$V6 <- as.numeric(t$V6)
+t$V7 <- as.numeric(t$V7)
+t$V8 <- as.numeric(t$V8)
+t$V9 <- as.numeric(t$V9)
+#Lasketaan mukaan muutokset viimeisen vuoden ja viimeisen kuukauden ajalta
+t$muutoskk <- t$V9-t$V8
+t$muutosv <- t$V9-t$V7
+t$muutoskk <- round(t$muutoskk,1)
+t$muutosv <- round(t$muutosv,1)
+
+#Asetetaan datan sarakkeiden nimiksi mukana olevat kuukaudet, vastaava määrittely kuin datan suodattamisessa yllä.
+names(t) <- c("Mittari", "Alue", data[(str_sub(data$Kuukausi,5,7)==kkloppu | Kuukausi==kked2), Kuukausi][1:7], "Muutos 1kk", "Muutos 1v")
+
+datatable(t, options=list(pageLength=20))
+```
+
+
+Työttömien taustatiedot
+=====================================
+
+Row
+-----------------------------------------------------------------------
+
+### Työttömät ikäluokan ja sukupuolen mukaan
+```{r}
+names(data_työnhakijat)[6] <- "Työnhakijat"
+data <- data_työnhakijat[Kuukausi==max(Kuukausi) & Sukupuoli!="Yhteensä" &Ikäryhmät!="Yhteensä" & Työllisyyskoodi=="Työtön", c(2,3,6)]
+data2 <- dcast(data, Sukupuoli~Ikäryhmät, value.var="Työnhakijat")
+
+kuvaaja5 <- amBarplot(x="Sukupuoli", y=c("15 - 19", "20 - 24", "25 - 29", "30 - 34", "35 - 39", "40 - 44",   "45 - 49", "50 - 54", "55 - 59",  "60 - 64", "65 -" ), data=data2, stack_type="regular", legend=TRUE, legendPosition="left", labelRotation=-45, groups_color=brewer.pal(n=11,name="RdBu"))
+kuvaaja5
+```
+
+### Työttömät koulutustasoittain
+```{r}
+names(data_koulutustaso)[7] <- "Työnhakijat"
+data <- data_koulutustaso[Kuukausi==max(Kuukausi) & Ikäryhmitys!="Yhteensä" &  Koulutusaste!="Yhteensä", c(3,5,7)]
+data2 <- dcast(data, Ikäryhmitys~Koulutusaste, value.var="Työnhakijat")
+
+kuvaaja6 <- amBarplot(x="Ikäryhmitys", y=c("Alempi perusaste", "Ylempi perusaste", "Toinen aste", "Erikoisammattikoulutusaste", "Alin korkea-aste", "Alempi korkeakouluaste", "Ylempi korkeakouluaste", "Tutkijakoulutusaste", "Ei perusasteen jälkeistä tutkintoa"), data=data2, stack_type="regular", legend=TRUE, legendPosition="left", labelRotation=-45, groups_color=brewer.pal(n=10,name="Spectral"))
+kuvaaja6
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Työttömät työnhaun keston mukaan
+```{r}
+names(data_kesto_ikä)[c(4,6)] <- c("Kesto", "Työnhakijat")
+data <- data_kesto_ikä[Kuukausi>raja2 & Ikäryhmitys=="Yhteensä" & Sukupuoli=="Yhteensä" & Kesto!="Yhteensä",c(4,5,6)]
+data2 <- dcast(data, Kuukausi~Kesto, value.var="Työnhakijat")
+data2$`Alle 1kk` <- data2[,14]+data2[,2]+data2[,6]
+data2$`1-3kk` <- data2[,10]+data2[,13]
+data$`3-6kk` <- data2[,3]
+data2$`6kk-1v` <- data2[,5]+data2[,9]
+data2$`1-2v` <- data2[,11]+data2[,12]
+data2$`2-3v` <- data2[,4]
+data2$`3-4v` <- data2[,7]
+data2$`4-5v` <- data2[,8]
+data2$`Yli 5v` <- data2[,16]
+data3 <- data2[,c(1,17:24)]
+
+kuvaaja7 <- amBarplot(x="Kuukausi", y=c("Alle 1kk", "1-3kk", "6kk-1v", "1-2v", "2-3v", "3-4v", "4-5v", "Yli 5v"), data=data3, stack_type="regular", legend=TRUE, legendPosition="bottom", labelRotation=-45, groups_color=brewer.pal(n=8,name="YlGnBu"))
+kuvaaja7
+
+```
+
+
+Työttömyysjaksot
+=====================================
+
+Row
+-----------------------------------------------------------------------
+
+### Työttömyyden kesto päättyneet ja jatkuvat
+
+```{r}
+#TE-toimistolta päättyneiden kesto
+data <- data_kesto[Alue=="Hämeenlinna" & Sukupuoli=="Yhteensä" & Ikäryhmitys=="Yhteensä", c(5,7)]
+names(data) <- c("Kuukausi","TyönhaunKestoVoim")
+#lisätään perään päättyneiden kesto
+data <- melt(data, id.vars="Kuukausi", value.var="TyönhaunKestoVoim")
+#Haetaan mukaan levyltä käsin koottu päättyneiden työttömyyksien kesto, tätä ei saa rajapinnalta
+data2 <- fread("../Data/päättyneidenkesto.csv", dec=",")
+data3 <- rbindlist(list(data,data2))
+data4 <- dcast(data3, Kuukausi~variable, value.var="value")
+data4 <- data4[Kuukausi>raja]
+
+kuvaaja8 <- plot_ly(data4, x=~Kuukausi) %>%
+  add_lines(y=~TyönhaunKestoVoim, name="Jatkuvat työttömyysjaksot", color=I("blue")) %>%
+  add_lines(y=~TyönhaunKestoPäät, name="Päättyneet työttömyysjaksot", color=I("orange")) %>%
+  layout(yaxis=list(title="Työttömyyden kesto (vko)"), xaxis=list(title="Kuukausi"))
+kuvaaja8
+```
+
+### Työttömyyden virta
+
+```{r}
+data <- data_virta[,c(5:9)]
+nimet <- names(data)
+names(data) <- c("Kuukausi", "Virta1kk", "Virta3kk", "Virta6kk", "Virta12kk")
+
+kuvaaja9 <- plot_ly(data, x=~Kuukausi) %>%
+  add_lines(y=~Virta1kk, name=nimet[2], color=I("blue")) %>%
+  add_lines(y=~Virta3kk, name=nimet[3], color=I("orange")) %>%
+  add_lines(y=~Virta6kk, name=nimet[4], color=I("red")) %>%
+  add_lines(y=~Virta12kk, name=nimet[5], color=I("green")) %>%
+  layout(yaxis=list(title="Työttömyyden virta"), xaxis=list(title="Kuukausi"))
+kuvaaja9
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Työtarjoukset TE-palveluissa
+
+```{r}
+#TE-toimistolta
+#10
+```
+
+### Päättyneet työnhaut syyn mukaan
+
+```{r}
+#TE-toimistolta
+#11
+```
+
+
+Palvelut
+=====================================
+
+Row
+-----------------------------------------------------------------------
+
+### Palveluissa olevat
+```{r}
+data <- data_palveluissa[,c(4,8:14)]
+#data2 <- melt(data, id.vars="Kuukausi")
+#data2$Palvelu <- as.character(data2$Palvelu)
+#names(data2) <- c("Kuukausi", "Palvelu", "Työttömät")
+names(data) <- c("Kuukausi", "Työvoimakoulutus", "Valmennus", "Työllistetty", "Kokeilu", "Vuorotteluvapaasijaisuus", "Kuntouttava", "Opiskelu")
+
+kuvaaja12 <- plot_ly(data, x=~Kuukausi) %>%
+  add_lines(y=~Työvoimakoulutus, name="Työvoimakoulutuksessa", color=I("blue")) %>%
+  add_lines(y=~Valmennus, name="Valmennusksessa", color=I("orange")) %>%
+  add_lines(y=~Työllistetty, name="Työllistettynä/työharjoittelussa", color=I("red")) %>%
+  add_lines(y=~Kokeilu, name="Kokeilussa", color=I("magenta")) %>%
+  add_lines(y=~Vuorotteluvapaasijaisuus, name="Vuorotteluvapaasijaiset", color=I("green")) %>%
+  add_lines(y=~Kuntouttava, name="Kuntouttava työtoiminta", color=I("black")) %>%
+  add_lines(y=~Opiskelu, name="Omaehtoinen opiskelu", color=I("light blue")) %>%
+  layout(yaxis=list(title="Työttömät palveluissa"), xaxis=list(title="Kuukausi"))
+kuvaaja12
+```
+
+### Palveluiden aloitukset
+```{r}
+#Palveluissa aloittaneet, ei saa rajapinnalta
+data <- fread("../Data/palveluissaaloittaneet.csv", dec=",")
+names(data) <- c("Kuukausi", "Yhteensä", "Työvoimakoulutus", "Valmennus", "Työllistetty", "Kokeilu", "Vuorotteluvapaasijaisuus", "Kuntouttava", "Opiskelu")
+
+kuvaaja13 <- plot_ly(data, x=~Kuukausi) %>%
+  add_lines(y=~Työvoimakoulutus, name="Työvoimakoulutuksessa", color=I("blue")) %>%
+  add_lines(y=~Valmennus, name="Valmennusksessa", color=I("orange")) %>%
+  add_lines(y=~Työllistetty, name="Työllistettynä/työharjoittelussa", color=I("red")) %>%
+  add_lines(y=~Kokeilu, name="Kokeilussa", color=I("magenta")) %>%
+  add_lines(y=~Vuorotteluvapaasijaisuus, name="Vuorotteluvapaasijaiset", color=I("green")) %>%
+  add_lines(y=~Kuntouttava, name="Kuntouttava työtoiminta", color=I("black")) %>%
+  add_lines(y=~Opiskelu, name="Omaehtoinen opiskelu", color=I("light blue")) %>%
+  layout(yaxis=list(title="Palveluissa aloittaneet"), xaxis=list(title="Kuukausi"))
+kuvaaja13
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Sosiaalinen kuntoutus
+```{r}
+#12
+```
+
+### Tyky-selvitykset
+```{r}
+#13
+```
+
+
+Kompassi
+=====================================
+
+```{r}
+#Kompassin data, Hämeenlinna-spesifi
+#Käsitellään dataa tässä lohkossa ja tehdään kuvaajia seuraavissa
+data <- fread("../Data/kompassi.csv", dec=",")
+data2 <- data[,-c(5,8:11,15,17:20,22,24)]
+names(data2) <- c("asiakasid", "asiakasluotu", "asiakaspäivitetty", "organisaatio", "sukupuoli", "ikä", "istunto", "istuntoaloitettu", "istuntopäivitetty", "ohjaaja", "pääväittämät", "yksikkö", "Työllistyvyys oma", "Työllistyvyys lask.", "Terveys oma", "Terveys lask.", "Psyykkinen oma", "Psyykkinen lask.", "Arki oma","Arki lask.", "Talous oma", "Talous lask.", "Osallisuus oma", "Osallisuus lask.", "Osaaminen oma", "Osaaminen lask.")
+data2$istuntoaika <- as.Date(str_remove(data2$istuntoaloitettu, " 00:00"), format="%d.%m.%Y")
+data2$asiakasaika <- as.Date(str_remove(data2$asiakasluotu, " 00:00"), format="%d.%m.%Y")
+data2$kompassinro <- ifelse(data2$istuntoaika<=data2$asiakasaika, 1, 2)
+data3 <- data2[yksikkö!="Pois"]
+data4 <- melt(data3, id=c(names(data3[,c(1:12,27,28,29)])))
+
+data4$arvio[data4$variable=="Työllistyvyys oma"] <- "Oma"
+data4$arvio[data4$variable=="Terveys oma"] <- "Oma"
+data4$arvio[data4$variable=="Psyykkinen oma"] <- "Oma"
+data4$arvio[data4$variable=="Arki oma"] <- "Oma"
+data4$arvio[data4$variable=="Talous oma"] <- "Oma"
+data4$arvio[data4$variable=="Osallisuus oma"] <- "Oma"
+data4$arvio[data4$variable=="Osaaminen oma"] <- "Oma"
+data4$arvio[data4$variable=="Työllistyvyys lask."] <- "Laskennallinen"
+data4$arvio[data4$variable=="Terveys lask."] <- "Laskennallinen"
+data4$arvio[data4$variable=="Psyykkinen lask."] <- "Laskennallinen"
+data4$arvio[data4$variable=="Arki lask."] <- "Laskennallinen"
+data4$arvio[data4$variable=="Talous lask."] <- "Laskennallinen"
+data4$arvio[data4$variable=="Osallisuus lask."] <- "Laskennallinen"
+data4$arvio[data4$variable=="Osaaminen lask."] <- "Laskennallinen"
+names(data4)[16:17] <- c("osio","arvo")
+data4$osio <- as.character(data4$osio)
+data5 <- data4[,c(1,5,6,10:18)]
+data5b <- data4[,c(1,5,6,10:17)]
+data6 <- dcast(data5b, asiakasid+ohjaaja+yksikkö+sukupuoli+ikä+istuntoaika+asiakasaika+kompassinro~osio, fun.aggregate=sum, value.var="arvo")
+```
+
+Row
+-----------------------------------------------------------------------
+### Tehdyt kompassit
+
+
+```{r}
+tehdyt <- data6[str_sub(data6$istuntoaika,1,7)==kknyt,length(asiakasid)]
+tehdyted <- data6[str_sub(data6$istuntoaika,1,7)==kked,length(asiakasid)]
+valueBox(tehdyt, icon = "body-outline")
+```
+
+### Toiset kompassit
+
+```{r}
+tehdyt2 <- data6[str_sub(data6$istuntoaika,1,7)==kknyt & kompassinro==2,length(asiakasid)]
+tehdyt2ed <- data6[str_sub(data6$istuntoaika,1,7)==kked & kompassinro==2,length(asiakasid)]
+valueBox(tehdyt2, icon = "fa-comments", color = "warning")
+```
+
+### Aktiiviset käyttäjät
+
+```{r}
+aktiiviset <- data6[str_sub(data6$istuntoaika,1,7)==kknyt, .(.N), by=ohjaaja]
+aktiivisetN <- dim(aktiiviset)[1]
+aktiiviseted <- data6[str_sub(data6$istuntoaika,1,7)==kked, .(.N), by=ohjaaja]
+aktiivisetNed <- dim(aktiiviset)[1]
+valueBox(aktiivisetN, icon = "fa-trash")
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Palvelutarpeet viimeisen kuukauden aikana
+```{r}
+kuvaaja14 <- plot_ly(data5[arvio=="Oma" & arvo!="NA"], x=~arvo, color=~osio, type="box", boxmean=TRUE)
+kuvaaja14
+
+```
+
+### Palvelutarpeet yksiköittäin pidemmällä aikavälillä
+```{r}
+datak <- data5[yksikkö %in% c("MYP/Työllisyys", "Ohjaamo", "Aikuissosiaalityö", "Henkisen hyvinvoinnin palvelut") & arvio=="Oma"]
+kuvaaja15 <- plot_ly(datak, x=~yksikkö, y=~arvo, color=~osio, type="box", boxmean=TRUE) %>%
+  layout(boxmode="group")
+kuvaaja15
+```
+
+
+Työllisyystiimi
+=====================================
+
+### Positiiviset siirtymät
+```{r}
+#16
+```
+
+
