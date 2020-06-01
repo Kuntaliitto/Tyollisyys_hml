@@ -2,6 +2,10 @@
 
 Ajamalla R-koodin saat kuntasi käyttöön Tilastokeskuksen, THL:n Sotkanetin ja Kelaston uusimmista tiedoista koostetun työllisyysraportin html-muodossa. Voit lisäksi liittää raporttiin Kelastosta TMT-kuntaosuudet tiedoston. Työllisyysraportti on luotu ja kirjoitettu Hämeenlinnan työllisyysyksikön tarpeisiin. Lisäksi mukana on Hämeenlinnan seudun työllisyysohjelman tilastoraporttipohja (Ketterimmät.Rmd).
 
+[![N|Solid](https://github.com/Kuntaliitto/Tyollisyys_hml/blob/master/layout1.png?raw=true)](https://github.com/Kuntaliitto/Tyollisyys_hml/blob/master/layout1.png?raw=true)
+
+[![N|Solid](https://github.com/Kuntaliitto/Tyollisyys_hml/blob/master/layout2.png?raw=true)](https://github.com/Kuntaliitto/Tyollisyys_hml/blob/master/layout2.png?raw=true)
+
 Tietovaraston osoite Kuntaliiton Githubissa:
 https://github.com/Kuntaliitto/Tyollisyys_hml
 
