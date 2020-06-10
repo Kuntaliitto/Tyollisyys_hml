@@ -69,8 +69,6 @@ Ajamalla R-kielessä tiedoston Työllisyysraporttien päivitys.R käynnistyy Ty�
 
 Lisenssi
 ----
-[BSD 3-Clause New license 2020][lisenssi] Ismo Hannula - Hämeenlinna
-
-
-   [lisenssi]: <https://opensource.org/licenses/BSD-3-Clause>
+Koodin lisensointia ei ole vielä ratkaistu ja ainakin toistaiseksi kaupallinen käyttö on rajattu pois 
+Ismo Hannula - Hämeenlinna
 
