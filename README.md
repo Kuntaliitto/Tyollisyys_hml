@@ -69,6 +69,6 @@ Ajamalla R-kielessä tiedoston Työllisyysraporttien päivitys.R käynnistyy Ty�
 
 Lisenssi
 ----
-Koodin lisensointia ei ole vielä ratkaistu ja ainakin toistaiseksi kaupallinen käyttö on rajattu pois 
+Koodin lisensointia ei ole vielä ratkaistu ja toistaiseksi kaupallinen käyttö on rajattu pois.
 Ismo Hannula - Hämeenlinna
 
