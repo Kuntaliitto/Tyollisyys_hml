@@ -26,7 +26,7 @@ library(sotkanet)
 #d <- pxweb_interactive("pxnet2.stat.fi")
 #d <- pxweb_interactive("vero2.stat.fi")
 #d <- pxweb_interactive("http://visitfinland.stat.fi/")
-nyt <- "2020 Maaliskuu"
+#nyt <- "2020 Maaliskuu"
 #rajataan alkupään dataa pois työllisyystilastoista
 raja <- "2014M12"
 ```
@@ -39,8 +39,6 @@ raja <- "2014M12"
 
 #### Taustatietoa
 Tässä raportissa esitellään Ketterimmät - Hämeenlinnan seudun työllisyysohjelmassa seurattavat tilastot. Ohjelma kokonaisuudessaan on luettavissa [täällä](https://www.hameenlinna.fi/tyo-ja-elinkeino/tyollisyyspalvelut/seudullinen-ketterimmat-tyollisyysohjelma/).
-
-Päivitetty 4/2020
 
 #### Käyttöohje
 Raportin kuvaajia voi muokata klikkaamalla sarjojen nimiä kuvaajan ala- tai yläpuolella. Valitsemalla vain osan sarjoista saa pienemmät luvut erottumaan paremmin. Kuvaajista saa yksittäiset luvut näkymään viemällä hiiren haluttuun pisteeseen. Osassa kuvaajista voi valita sarjat päällekkäin (stacked), vierekkäin (grouped), suhteellisina osuuksina (expanded) tai symmetrisenä virtakuviona (stream). 
@@ -385,7 +383,7 @@ Lähde: Kunnat (2016 asti), Kela (2017 alkaen) -> THL Sotkanet
 #kuvaaja16 <- hPlot(Kotitaloudet~Vuosi, group="Kunta", type="line", data=data)
 #kuvaaja16$print('Kuvaaja16', include_assets = TRUE)
 aluejaot <- c("KUNTA", "MAA", "SEUTUKUNTA", "MAAKUNTA")
-vuodet <- c(1991:2018)
+vuodet <- c(1991:2019)
 alueet <- c("Hattula", "Hämeenlinna", "Janakkala", "Hämeenlinnan seutukunta")
 data <- GetDataSotkanet(4019, region.category = aluejaot, years=vuodet, region = alueet)
 data2 <- setDT(data[,c(2,7,9)])
@@ -405,7 +403,7 @@ kuvaaja109
 Lähde: Sotkanet
 ```{r echo=F, message=F, warning=F, results='asis', comment=NA}
 aluejaot <- c("KUNTA", "MAA", "SEUTUKUNTA", "MAAKUNTA")
-vuodet <- c(1991:2017)
+vuodet <- c(1991:2018)
 alueet <- c("Hattula", "Hämeenlinna", "Janakkala", "Hämeenlinnan seutukunta", "Kanta-Häme", "Koko maa")
 data <- GetDataSotkanet(2424, region.category = aluejaot, years=vuodet, region = alueet)
 data2 <- setDT(data[,c(2,7,9)])

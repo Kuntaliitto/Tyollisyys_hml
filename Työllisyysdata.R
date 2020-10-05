@@ -19,7 +19,7 @@ seudunkunnat <- c('KU082','KU109','KU165')
 omakunta <- "KU109"
 seutukunta <- "SK051"
 #Yhdessä haussa käytetään pelkkiä kuntanumeroita
-seutukuntanro <- c('082','109','165')
+seudunkunnat2 <- c('082','109','165')
 
 #Haetaan dataa rajapinnalta
 #Haut tuottavat useita varoituksia NA-arvoista, jos haussa on mukana alle 5:n soluja
@@ -90,7 +90,8 @@ px_data <-
 data_palveluissa <- as.data.frame(px_data, column.name.type = "text", variable.value.type = "text")
 write.table(data_palveluissa, "../Data/rajapinta/data_palveluissa.csv", sep=";", dec=",", row.names=FALSE)
 
-#Palveluiden aloitukset??
+#Aktivointiaste
+
 
 #Työnhakijat ja avoimet työpaikat ammateittain
 px_data <- 
@@ -196,7 +197,7 @@ write.table(data_ikäryhmät, "../Data/rajapinta/data_ikäryhmät.csv", sep=";", dec
 px_data <- 
   pxweb_get(url = "http://pxnet2.stat.fi/PXWeb/api/v1/fi/StatFin/tul/tvt/statfin_tvt_pxt_11i8.px",
             query = list("Vuosi"=c("*"),
-                         "Kunta"=seutukuntanro,
+                         "Kunta"=seudunkunnat2,
                          "Tiedot"=c("Lkm_sum","lkuve_mean")))
 data_verotulot <- as.data.frame(px_data, column.name.type = "text", variable.value.type = "text")
 write.table(data_verotulot, "../Data/rajapinta/data_verotulot.csv", sep=";", dec=",", row.names=FALSE)
